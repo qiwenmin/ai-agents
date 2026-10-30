@@ -68,7 +68,32 @@ compatibility: Requires the openscad CLI (2021.01+). Work inside the modeling-as
 
 - **避免用 `box()`**：本机构建没有该模块，用 `cube()` 代替。
 
-- **开孔/凹槽**：`difference()` 里减一个稍大的圆柱/长方体。
+- **开孔/凹槽（切刀超出量）**：`difference()` 的切刀严禁与实体表面共面——
+  共面会导致 preview 出现条纹/z-fighting，布尔结果不确定。切刀沿**穿透方向**
+  外扩一个微小超出量 `eps`，标注尺寸的定位面保持精确：
+  ```scad
+  eps = 0.01;  // 微小超出量（0.01~0.05 均可），只加在穿透方向
+  difference() {
+    cube([L, W, t]);
+    // 通孔：上下各超出 eps；孔位/孔径保持精确
+    translate([x, y, -eps]) cylinder(d=hole_d, h=t + 2*eps);
+    // 贯穿侧壁的槽：壁厚方向两侧外扩；槽宽/槽底保持精确
+    translate([-eps, y0, z0]) cube([t + 2*eps, w, h + eps]);
+  }
+  ```
+- **拼接（union）不要恰好贴合**：布尔操作数要么充分重叠、要么明确分离，与切刀
+  同一条原则。贴合拼接 CGAL 能干净融合（接触面成内部面被删，实测与重叠拼接
+  产物相同），但接触坐标只要差 ≥1e-6（表达式/三角函数推导的浮点误差）就会
+  **静默裂成两片壳**——0 error、STL 照常导出、preview 看不出，切片时才暴露。
+  正确做法是体积重叠/深埋，重叠量无需精确：
+  ```scad
+  union() {
+    cube([L, W, t]);   // 底板
+    cube([tw, W, H]);  // 立墙从 Z=0 长到顶、深埋进底板；不要 translate 到板面再放
+  }
+  ```
+  自检：`openscad -o x.stl` 统计里实心单件应 `Volumes: 2`（外空间+实体）；
+  无内腔却出现 3 = 裂件（002 那类带空腔的除外）。
 - **沉头孔**：两个同心圆柱相减（大径浅 + 小径深）。
 - **阵列**：`for (x = [a:(step):b]) translate([x,0,0]) feature();`
 - **圆周阵列**：
@@ -89,6 +114,6 @@ compatibility: Requires the openscad CLI (2021.01+). Work inside the modeling-as
 
 - [ ] `openscad -q --export-format=echo -o -` 0 error
 - [ ] STL 文件已生成且大小 > 0
-- [ ] PNG 预览目检通过（比例、孔位、无缺块）
+- [ ] PNG 预览目检通过（比例、孔位、无缺块、槽/孔内面无共面条纹）
 - [ ] 所有尺寸可在文件顶部参数区一处修改
 - [ ] 向用户说明了参数含义和如何用 `-D` 快速改尺寸
