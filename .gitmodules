@@ -1,0 +1,3 @@
+[submodule "modeling-assistant/lib/BOSL2"]
+	path = modeling-assistant/lib/BOSL2
+	url = https://github.com/BelfrySCAD/BOSL2.git
